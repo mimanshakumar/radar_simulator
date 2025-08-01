@@ -181,48 +181,45 @@ class RadarApp(tk.Tk):
         self.ax_ppi.set_ylim(-self.display_range, self.display_range)
 
         for r in np.linspace(0.25, 1.0, 4) * self.display_range:
-            self.ax_ppi.add_patch(Circle((0, 0), r, fill=False, edgecolor='lime', linestyle='--', alpha=0.5)) #concentric circles to be made
+            self.ax_ppi.add_patch(Circle((0, 0), r, fill=False, edgecolor='lime', linestyle='--', alpha=0.5)) #concentric circles
             self.ax_ppi.text(5000, r + 5000, f'{r/1000:.0f} km', color='lime', fontsize=8)
         bx, by = self.display_range * np.cos(np.deg2rad(self.beam_angle)), self.display_range * np.sin(np.deg2rad(self.beam_angle))
         self.ax_ppi.plot([0, bx], [0, by], color='lime', linewidth=1)
         radar_params = {'tx_power': self.tx_power_var.get(), 'antenna_gain': self.antenna_gain_var.get(),
-                        'wavelength': C / self.frequency_var.get(), 'rcs': 1.0, 'snr_min_db': self.snr_min_db_var.get()}
+                        'wavelength': C / self.frequency_var.get(), 'rcs': 1.0, 'snr_min_db': self.snr_min_db_var.get()} #collecting all the parameters to display
         
         log_string = f"Time: {self.sim_time:.1f}s | Beam: {self.beam_angle:.0f}°\n"
-        log_string += "---------------------------------------------------------------\n"
+        log_string += "-------------------------------------------------------------------------------\n"
         log_string += "ID   | Status   | Range(km) | R_max(km) | Speed(m/s) | ETA\n"
-        log_string += "---------------------------------------------------------------\n"
+        log_string += "-------------------------------------------------------------------------------\n"
 
         for target in self.targets:
-            target_angle = (np.rad2deg(np.arctan2(target.pos[1], target.pos[0])) + 360) % 360
+            target_angle = (np.rad2deg(np.arctan2(target.pos[1], target.pos[0])) + 360) % 360 #first we get degree in [-pi, pi], then it's changed to degrees, then finally to range [0,2pi]
             beam_diff = abs((self.beam_angle - target_angle + 180) % 360 - 180)
             if not (beam_diff < 5.0): continue
 
             radar_params['rcs'] = target.rcs
-            target_max_range = calculate_rre_max_range(radar_params)
-            target_current_range = np.linalg.norm(target.pos)
-            is_detected = target_current_range <= target_max_range
-
-            if is_detected:
+            target_max_range = calculate_rre_max_range(radar_params) #using rre we get max range
+            target_current_range = np.linalg.norm(target.pos) #current range of target
+            is_detected = target_current_range <= target_max_range #checks if target is in detectable range
+            if is_detected: #if yes it shows as moving and detects range and all other requirements and shows in the detection log
                 radial_velocity, is_moving = moving_target_indicator(target)
                 speed_ms = np.linalg.norm(target.vel)
                 eta_str = "--:--"
-                
+                #if no MTI is selected          
                 status = "NO MTI"
                 if self.mti_enabled_var.get():
                     if is_moving:
-                        color = 'red' if radial_velocity < 0 else 'skyblue'
+                        color = 'red' if radial_velocity < 0 else 'blue' #target moving towards radar is in red, away is in blue
                         self.ax_ppi.plot(target.pos[0], target.pos[1], 'o', color=color, markersize=7)
                         vel_line_end = target.pos + target.vel * 50
                         self.ax_ppi.plot([target.pos[0], vel_line_end[0]], [target.pos[1], vel_line_end[1]], color=color, linewidth=1.5)
-                        status = "MOVING"
-                        
+                        status = "MOVING"                    
                         if radial_velocity < 0:
                             eta_seconds = target_current_range / abs(radial_velocity)
                             minutes = int(eta_seconds / 60)
                             seconds = int(eta_seconds % 60)
                             eta_str = f"{minutes:02d}:{seconds:02d}"
-
                     else:
                         self.ax_ppi.plot(target.pos[0], target.pos[1], '^', color='white', markersize=8)
                         status = "CLUTTER"
