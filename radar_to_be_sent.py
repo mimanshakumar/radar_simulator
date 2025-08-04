@@ -14,15 +14,15 @@ class Target:
         self.id = target_id
         self.pos = np.array([x, y], dtype=float) #store target's position
         self.vel = np.array([vx, vy], dtype=float) #store target's velocity
-        self.rcs = rcs
+        self.rcs = rcs #radius of cross section of target - how detectable is the target
         self.is_clutter = is_clutter #storing stationary target
         self.accel = np.array([0.0, 0.0], dtype=float) #storing target's acceleration
 
     def update(self, dt):
         """Update target position based on its velocity and acceleration."""
-        if not self.is_clutter:
+        if not self.is_clutter: #if not clutter
             if np.random.rand() < 0.01: #target will now change course every 5 seconds 
-                self.accel = (np.random.rand(2) - 0.5) * 20 #changing the acceleration after being in a certain direction for a bit then changing its range from [0,1] to [-0.5,0.5], then to [-10,10]
+                self.accel = (np.random.rand(2) - 0.5) * 20 #changing the acceleration (randomly)after being in a certain direction for a bit then changing its range from [0,1] to [-0.5,0.5], then to [-10,10]
             self.vel += self.accel * dt #(v=u+at)
             self.pos += self.vel * dt #(x=vdt+x)
 
@@ -61,8 +61,8 @@ def moving_target_indicator(target):
 class RadarApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Radar Simulation")
-        self.geometry("1200x1200")
+        self.title("Radar Simulation") #window title 
+        self.geometry("1400x1000") #window size
 
         self.is_running = False
         self.beam_angle = 0.0
@@ -93,7 +93,7 @@ class RadarApp(tk.Tk):
         self.num_targets_var = tk.IntVar(value=8)
         self.num_clutter_var = tk.IntVar(value=5)
         self._create_entry(target_gen_frame, "Aircraft Targets:", self.num_targets_var, 0)
-        self._create_entry(target_gen_frame, "Clutter:", self.num_clutter_var, 1)
+        self._create_entry(target_gen_frame, "Stationary Targets:", self.num_clutter_var, 1)
 
         radar_params_frame = ttk.LabelFrame(left_panel, text="Radar Parameters", padding=10)
         radar_params_frame.pack(fill=tk.X, pady=10)
@@ -108,7 +108,7 @@ class RadarApp(tk.Tk):
         self._create_entry(radar_params_frame, "Antenna Gain(dB):", self.antenna_gain_var, 1)
         self._create_entry(radar_params_frame, "Frequency(Hz):", self.frequency_var, 2)
         self._create_entry(radar_params_frame, "Min. Detection SNR(dB):", self.snr_min_db_var, 3)
-        ttk.Checkbutton(radar_params_frame, text="Enable MTI", variable=self.mti_enabled_var).grid(row=4, columnspan=2, pady=5)
+        #ttk.Checkbutton(radar_params_frame, text="Enable MTI", variable=self.mti_enabled_var).grid(row=4, columnspan=2, pady=5)
         
         log_frame = ttk.LabelFrame(left_panel, text="Detection Log", padding=10)
         log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
@@ -117,7 +117,7 @@ class RadarApp(tk.Tk):
         self.log_text.pack(fill=tk.BOTH, expand=True)
         self.log_text.config(state=tk.DISABLED)
 
-        #PPI display [Plane Position Indicator]
+        #PPI display [Plane Position Indicator] - radar display
         self.fig_ppi, self.ax_ppi = plt.subplots(figsize=(8, 8))
         self.canvas_ppi = FigureCanvasTkAgg(self.fig_ppi, master=main_frame)
         self.canvas_ppi.get_tk_widget().pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
@@ -145,16 +145,16 @@ class RadarApp(tk.Tk):
 
     def generate_targets(self, num_targets, num_clutter, max_range):
         targets = []
-        for i in range(num_targets): #target
+        for i in range(num_targets): #how many targets
             angle, r = np.random.rand() * 2 * np.pi, np.sqrt(np.random.rand()) * max_range * 0.95 #angles will be from 0 to 2pi 
             x, y = r * np.cos(angle), r * np.sin(angle) #polar to cartesian conversion
-            vx, vy = (np.random.rand(2) - 0.5) * 600 #assigning velocity 
-            rcs = 10**(np.random.uniform(-1, 1.5)) #some small/big targets
+            vx, vy = (np.random.rand(2) - 0.5) * 600 #assigning velocity (0,1) to (-0.5,0.5) then *600 to bring in range of [-300,300]m/s realistic acceleration of a target
+            rcs = 10**(np.random.uniform(-1, 1.5)) #some small/big targets between 0.1 - 31.6 m^2
             targets.append(Target(f"T{i}", x, y, vx, vy, rcs)) #assigning a label to the target ie. T0, T1
-        for i in range(num_clutter): #mountain
-            angle, r = np.random.rand() * 2 * np.pi, np.random.uniform(0.1, 0.9) * max_range
-            x, y = r * np.cos(angle), r * np.sin(angle)
-            rcs = np.random.uniform(50, 500)
+        for i in range(num_clutter): #mountain/sttionary
+            angle, r = np.random.rand() * 2 * np.pi, np.random.uniform(0.1, 0.9) * max_range #angle= anywhere 360 degrees, range=[0.1-300]km
+            x, y = r * np.cos(angle), r * np.sin(angle) #position using physics formula 
+            rcs = np.random.uniform(50, 500) #equal probability os having rcs between 50-500, ie. small/big mountain
             targets.append(Target(f"C{i}", x, y, 0, 0, rcs, is_clutter=True)) #velocity of clutter=0 and C0, C1 
         return targets
 
@@ -162,7 +162,7 @@ class RadarApp(tk.Tk):
         if not self.is_running: return #starting the simulation 
         
         self.sim_time += self.time_step
-        self.beam_angle = (self.beam_angle + 2.0) % 360 #2 degree movement in each frame
+        self.beam_angle = (self.beam_angle + 2.0) % 360 #2 degree movement in each frame 
         
         for target in self.targets:
             target.update(self.time_step)
@@ -180,11 +180,11 @@ class RadarApp(tk.Tk):
         self.ax_ppi.set_xlim(-self.display_range, self.display_range)
         self.ax_ppi.set_ylim(-self.display_range, self.display_range)
 
-        for r in np.linspace(0.25, 1.0, 4) * self.display_range:
+        for r in np.linspace(0.25, 1.0, 4) * self.display_range: #where all to put the concentric circles, at these intervals
             self.ax_ppi.add_patch(Circle((0, 0), r, fill=False, edgecolor='lime', linestyle='--', alpha=0.5)) #concentric circles
-            self.ax_ppi.text(5000, r + 5000, f'{r/1000:.0f} km', color='lime', fontsize=8)
-        bx, by = self.display_range * np.cos(np.deg2rad(self.beam_angle)), self.display_range * np.sin(np.deg2rad(self.beam_angle))
-        self.ax_ppi.plot([0, bx], [0, by], color='lime', linewidth=1)
+            self.ax_ppi.text(5000, r + 5000, f'{r/1000:.0f} km', color='lime', fontsize=8) #radius of circle written
+        bx, by = self.display_range * np.cos(np.deg2rad(self.beam_angle)), self.display_range * np.sin(np.deg2rad(self.beam_angle)) #beam's x and y coordinates
+        self.ax_ppi.plot([0, bx], [0, by], color='lime', linewidth=1) #beam of the radar
         radar_params = {'tx_power': self.tx_power_var.get(), 'antenna_gain': self.antenna_gain_var.get(),
                         'wavelength': C / self.frequency_var.get(), 'rcs': 1.0, 'snr_min_db': self.snr_min_db_var.get()} #collecting all the parameters to display
         
@@ -194,9 +194,10 @@ class RadarApp(tk.Tk):
         log_string += "-------------------------------------------------------------------------------\n"
 
         for target in self.targets:
-            target_angle = (np.rad2deg(np.arctan2(target.pos[1], target.pos[0])) + 360) % 360 #first we get degree in [-pi, pi], then it's changed to degrees, then finally to range [0,2pi]
-            beam_diff = abs((self.beam_angle - target_angle + 180) % 360 - 180)
-            if not (beam_diff < 5.0): continue
+            target_angle = (np.rad2deg(np.arctan2(target.pos[1], target.pos[0])) + 360) % 360 
+            #first we get x and y position in radians, then it's changed to degrees, then finally to range [0,2pi]
+            beam_diff = abs((self.beam_angle - target_angle + 180) % 360 - 180) #returns the shortest path ie. angular distance between radar beam and target
+            if not (beam_diff < 5.0): continue #after 5 degree difference exceeds, the target will disappear from the radar's display
 
             radar_params['rcs'] = target.rcs
             target_max_range = calculate_rre_max_range(radar_params) #using rre we get max range
@@ -209,22 +210,22 @@ class RadarApp(tk.Tk):
                 #if no MTI is selected          
                 status = "NO MTI"
                 if self.mti_enabled_var.get():
-                    if is_moving:
+                    if is_moving: #rad vel < 0 - towards, > 0 - away
                         color = 'red' if radial_velocity < 0 else 'blue' #target moving towards radar is in red, away is in blue
                         self.ax_ppi.plot(target.pos[0], target.pos[1], 'o', color=color, markersize=7)
-                        vel_line_end = target.pos + target.vel * 50
-                        self.ax_ppi.plot([target.pos[0], vel_line_end[0]], [target.pos[1], vel_line_end[1]], color=color, linewidth=1.5)
+                        vel_line_end = target.pos + target.vel * 50 #tail of the target
+                        self.ax_ppi.plot([target.pos[0], vel_line_end[0]], [target.pos[1], vel_line_end[1]], color=color, linewidth=1.5) #how are the coordinates of this tail moving?
                         status = "MOVING"                    
-                        if radial_velocity < 0:
+                        if radial_velocity < 0: #eta only for targets moving towards the radar
                             eta_seconds = target_current_range / abs(radial_velocity)
                             minutes = int(eta_seconds / 60)
                             seconds = int(eta_seconds % 60)
                             eta_str = f"{minutes:02d}:{seconds:02d}"
                     else:
                         self.ax_ppi.plot(target.pos[0], target.pos[1], '^', color='white', markersize=8)
-                        status = "CLUTTER"
+                        status = "STATIONARY"
                 else:
-                    self.ax_ppi.plot(target.pos[0], target.pos[1], 'x', color='red', markersize=8)
+                    self.ax_ppi.plot(target.pos[0], target.pos[1], 'x', color='red', markersize=8) #detection log format and final output
                 log_string += f"{target.id:<4} | {status:<8} | {target_current_range/1000:<9.1f} | {target_max_range/1000:<9.1f} | {speed_ms:<10.1f} | {eta_str}\n"
 
         self.log_text.config(state=tk.NORMAL)
