@@ -210,8 +210,8 @@ class RadarApp(tk.Tk):
                 #if no MTI is selected          
                 status = "NO MTI"
                 if self.mti_enabled_var.get():
-                    if is_moving: #rad vel < 0 - towards, > 0 - away
-                        color = 'red' if radial_velocity < 0 else 'blue' #target moving towards radar is in red, away is in blue
+                    if is_moving: #rad vel < 0 means moving
+                        color = 'red'
                         self.ax_ppi.plot(target.pos[0], target.pos[1], 'o', color=color, markersize=7)
                         vel_line_end = target.pos + target.vel * 50 #tail of the target
                         self.ax_ppi.plot([target.pos[0], vel_line_end[0]], [target.pos[1], vel_line_end[1]], color=color, linewidth=1.5) #how are the coordinates of this tail moving?
